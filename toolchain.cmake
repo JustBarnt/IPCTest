@@ -1,0 +1,8 @@
+set(CMAKE_C_COMPILER clang-cl)
+set(CMAKE_CXX_COMPILER clang-cl)
+set(CMAKE_C_COMPILER_TARGET x86_64-pc-windows-msvc)
+set(CMAKE_CXX_COMPILER_TARGET x86_64-pc-windows-msvc)
+
+set(CMAKE_EXE_LINKER_FLAGS_INIT "/machine:X64")
+set(CMAKE_SHARED_LINKER_FLAGS_INIT "/machine:X64")
+set(CMAKE_MODULE_LINKER_FLAGS_INIT "/machine:X64")
