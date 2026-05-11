@@ -2,18 +2,38 @@
 #include <ws2tcpip.h>
 #include <atomic>
 #include <string>
+#include <format>
 #include <iostream>
 
 std::atomic<bool> running{true};
 
-void handleCommand(const std::string& cmd)
+int writeError(std::string message)
 {
-  if (cmd == "STOP") running = false;
+  std::cerr << message << WSAGetLastError() << "\n";
+  return 1;
+}
+
+std::string handleCommand(const std::string& cmd)
+{
+  std::string returnBuffer = std::format("INVALID COMMAND: {0}", cmd);
+
+  if (cmd == "STOP")
+  {
+    running = false;
+    returnBuffer = "";
+  }
 
   // Other commands here
   // Maybe add a 'pong' command
 
-  if (cmd == "PONG") std::cout << "COMMAND: " << "PONG" << "\n";
+  if (cmd == "PING")
+  {
+    int iRes;
+    std::cout << "COMMAND: " << "PONG" << "\n";
+    returnBuffer = "PONG";
+  } 
+
+  return returnBuffer;
 }
 
 void recvLoop(SOCKET client)
@@ -37,24 +57,9 @@ void recvLoop(SOCKET client)
 
       std::cout << "Buffer: " << buffer << "\n";
 
-      size_t pos;
-      while ((pos = buffer.find('\n')) != std::string::npos)
-      {
-        // Assume entire command is every up to the line "\n"
-        std::string cmd = buffer.substr(0, pos);
-
-        if (!cmd.empty() && cmd.back() == '\r')
-          cmd.pop_back(); // Remove rogue '\r'
-
-        if (!cmd.empty())
-          handleCommand(cmd);
-
-        buffer.erase(0, pos + 1);
-      }
-
-      // If we don't find a \n we assume that everything is the command
-      handleCommand(buffer);
+      std::string sendBuffer = handleCommand(buffer);
       buffer.erase(0);
+      int res = send(client, sendBuffer.c_str(), sendBuffer.size(), 0);
     } else if (bytesRecv == 0)
     {
       // In the real implementation for SaxonC app, we do not want to disconnect, we just want to wait until
@@ -67,13 +72,6 @@ void recvLoop(SOCKET client)
     }
   }
 }
-
-int writeError(std::string message)
-{
-  std::cerr << message << WSAGetLastError() << "\n";
-  return 1;
-}
-
 
 int main()
 {
@@ -128,6 +126,13 @@ int main()
   recvLoop(client);
 
   std::cout << "Cleaning up...\n";
+  // MS Learn says we should shut down the send half of the connection once we are done?
+  // https://learn.microsoft.com/en-us/windows/win32/winsock/disconnecting-the-client
+  if ((shutdown(client, SD_SEND)) == SOCKET_ERROR)
+  {
+    cleanup();
+    return writeError("shutdown() failed: ");
+  }
   // I need to remember that we clean-up in the reverse order everything was initialized, 
   // so there are no dangling pointers and such
   closesocket(client);
